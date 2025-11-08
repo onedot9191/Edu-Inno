@@ -521,7 +521,7 @@ function App() {
                   disabled={loading}
                   className="bubble-button w-full bg-gradient-to-r from-yellow-400 to-orange-400 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  골라줘! ✨
+                  시작하기! ✨
                 </button>
               </div>
             </form>
