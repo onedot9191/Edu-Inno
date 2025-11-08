@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+/* 웹폰트 - Pretendard */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+
+/* 귀여운 손글씨 폰트 - Gamja Flower */
+@import url('https://fonts.googleapis.com/css2?family=Gamja+Flower&display=swap');
+
+* {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* 모눈종이 패턴 배경 */
+.pattern-grid {
+  background-color: #F3E5F5;
+  background-image: 
+    linear-gradient(rgba(186, 104, 200, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(186, 104, 200, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* 도트 패턴 배경 (대안) */
+.pattern-dots {
+  background-color: #E3F2FD;
+  background-image: radial-gradient(circle, rgba(100, 181, 246, 0.15) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* 스티커 스타일 */
+.sticker {
+  background: white;
+  border: 3px solid;
+  box-shadow: 
+    4px 4px 0 rgba(0, 0, 0, 0.1),
+    8px 8px 0 rgba(0, 0, 0, 0.05);
+  transform: rotate(-0.5deg);
+  transition: all 0.3s ease;
+}
+
+.sticker:hover {
+  transform: rotate(0deg) translateY(-2px);
+  box-shadow: 
+    6px 6px 0 rgba(0, 0, 0, 0.1),
+    12px 12px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* 왕방울 버튼 */
+.bubble-button {
+  padding: 16px 32px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  border-radius: 9999px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 
+    0 4px 0 rgba(0, 0, 0, 0.1),
+    0 8px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(0);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.bubble-button:hover:not(:disabled) {
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 
+    0 6px 0 rgba(0, 0, 0, 0.1),
+    0 12px 25px rgba(0, 0, 0, 0.15);
+}
+
+.bubble-button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 
+    0 2px 0 rgba(0, 0, 0, 0.1),
+    0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* 손글씨 폰트 클래스 */
+.font-handwriting {
+  font-family: 'Gamja Flower', cursive;
+}
+
+/* 부드러운 바운스 애니메이션 */
+@keyframes bounce-gentle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-bounce-gentle {
+  animation: bounce-gentle 2s ease-in-out infinite;
+}
+
+/* 호버 시 확대 효과 */
+.hover-scale-102:hover {
+  transform: scale(1.02);
+}
+
+/* 3D 그림자 효과 */
+.shadow-3d {
+  box-shadow: 
+    0 1px 0 #ccc,
+    0 2px 0 #c9c9c9,
+    0 3px 0 #bbb,
+    0 4px 0 #b9b9b9,
+    0 5px 0 #aaa,
+    0 6px 1px rgba(0,0,0,.1),
+    0 0 5px rgba(0,0,0,.1),
+    0 1px 3px rgba(0,0,0,.3),
+    0 3px 5px rgba(0,0,0,.2),
+    0 5px 10px rgba(0,0,0,.25),
+    0 10px 10px rgba(0,0,0,.2),
+    0 20px 20px rgba(0,0,0,.15);
+}
