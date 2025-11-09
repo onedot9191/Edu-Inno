@@ -96,12 +96,12 @@ body {
 
 .animate-bounce-gentle {
   animation: bounce-gentle 2s ease-in-out infinite;
-}
+  }
 
 /* 호버 시 확대 효과 */
 .hover-scale-102:hover {
   transform: scale(1.02);
-}
+  }
 
 /* 3D 그림자 효과 */
 .shadow-3d {
