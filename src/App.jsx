@@ -1,18 +1,19 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import OpenAI from 'openai'
+import html2canvas from 'html2canvas'
 
 // 진행 단계 표시 컴포넌트
 function ProgressBar({ currentStep, totalSteps }) {
   return (
-    <div className="fixed top-0 left-0 right-0 bg-white shadow-md z-40 py-4 px-6">
+    <div className="fixed top-0 left-0 right-0 bg-white shadow-md z-40 py-2 md:py-4 px-3 md:px-6">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="text-2xl font-bold text-purple-600">
+        <div className="flex items-center gap-2 md:gap-3 mb-2">
+          <span className="text-lg md:text-2xl font-bold text-purple-600">
             {currentStep}/{totalSteps}단계
           </span>
-          <span className="text-lg text-gray-600">진행 중...</span>
+          <span className="text-sm md:text-lg text-gray-600">진행 중...</span>
         </div>
-        <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-3 md:h-4 bg-gray-200 rounded-full overflow-hidden">
           <div 
             className="h-full bg-gradient-to-r from-pink-400 via-purple-400 to-blue-400 transition-all duration-500 ease-out"
             style={{ width: `${(currentStep / totalSteps) * 100}%` }}
@@ -26,15 +27,15 @@ function ProgressBar({ currentStep, totalSteps }) {
 // AI 캐릭터 가이드 컴포넌트
 function AIGuide({ message, emoji = "🤖" }) {
   return (
-    <div className="mb-8 flex justify-center animate-bounce-gentle">
-      <div className="relative bg-white rounded-3xl shadow-xl p-6 max-w-2xl border-4 border-yellow-300">
+    <div className="mb-4 md:mb-8 flex justify-center animate-bounce-gentle px-2">
+      <div className="relative bg-white rounded-2xl md:rounded-3xl shadow-xl p-4 md:p-6 w-full max-w-2xl border-4 border-yellow-300">
         {/* 말풍선 꼬리 */}
         <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[16px] border-l-transparent border-r-[16px] border-r-transparent border-t-[16px] border-t-yellow-300" />
         <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-t-[14px] border-t-white" />
         
-        <div className="flex items-center gap-4">
-          <div className="text-5xl">{emoji}</div>
-          <p className="text-xl font-bold text-gray-800 leading-relaxed">
+        <div className="flex items-center gap-2 md:gap-4">
+          <div className="text-3xl md:text-5xl flex-shrink-0">{emoji}</div>
+          <p className="text-base md:text-xl font-bold text-gray-800 leading-relaxed">
             {message}
           </p>
         </div>
@@ -46,13 +47,13 @@ function AIGuide({ message, emoji = "🤖" }) {
 // 별점 컴포넌트
 function StarRating({ rating, onRatingChange }) {
   return (
-    <div className="flex gap-1 justify-center">
+    <div className="flex gap-1 md:gap-2 justify-center">
       {[1, 2, 3, 4, 5].map((star) => (
         <button
           key={star}
           type="button"
           onClick={() => onRatingChange(star)}
-          className="text-4xl hover:scale-125 transform transition-all duration-150"
+          className="text-2xl md:text-4xl hover:scale-125 transform transition-all duration-150 min-h-[44px] min-w-[44px] flex items-center justify-center"
         >
           {star <= rating ? '⭐' : '☆'}
         </button>
@@ -103,6 +104,8 @@ function App() {
   const [answerB, setAnswerB] = useState('')
   const [aiFeedback, setAiFeedback] = useState(null)
   const [feedbackLoading, setFeedbackLoading] = useState(false)
+  const [imageDownloading, setImageDownloading] = useState(false)
+  const shareCardRef = useRef(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -363,6 +366,95 @@ function App() {
     setAiFeedback(null)
   }
 
+  // 공유 카드 이미지로 저장하기
+  const handleDownloadImage = async () => {
+    if (!shareCardRef.current) {
+      console.error('공유 카드 ref가 없습니다')
+      setError('이미지를 저장할 수 없어요. 페이지를 새로고침해주세요! 📸')
+      return
+    }
+
+    setImageDownloading(true)
+    setError(null)
+
+    try {
+      const element = shareCardRef.current
+      
+      // 폰트와 이미지가 로드될 때까지 대기
+      await new Promise(resolve => {
+        if (document.fonts && document.fonts.ready) {
+          document.fonts.ready.then(() => {
+            setTimeout(resolve, 300)
+          })
+        } else {
+          setTimeout(resolve, 500)
+        }
+      })
+      
+      // 공유 카드의 실제 크기 계산
+      const rect = element.getBoundingClientRect()
+      
+      console.log('이미지 생성 시작:', { width: rect.width, height: rect.height })
+      
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#fef3f2',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        allowTaint: true, // 로컬 서버에서도 작동하도록 true로 변경
+        foreignObjectRendering: false,
+        removeContainer: false,
+        imageTimeout: 30000,
+        width: rect.width,
+        height: rect.height,
+        x: 0,
+        y: 0,
+        scrollX: -window.scrollX,
+        scrollY: -window.scrollY,
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight
+      })
+
+      console.log('Canvas 생성 완료:', { width: canvas.width, height: canvas.height })
+
+      // Blob으로 변환
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          console.error('Blob 생성 실패')
+          setError('이미지 변환에 실패했어요. 다시 시도해주세요! 📸')
+          setImageDownloading(false)
+          return
+        }
+
+        console.log('Blob 생성 완료:', blob.size, 'bytes')
+
+        // 다운로드 링크 생성
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+        const safeItemName = item.replace(/[^a-zA-Z0-9가-힣]/g, '_')
+        link.download = `합리적선택_${safeItemName}_${timestamp}.png`
+        link.href = url
+        link.style.display = 'none'
+        
+        document.body.appendChild(link)
+        link.click()
+        
+        // 정리
+        setTimeout(() => {
+          document.body.removeChild(link)
+          URL.revokeObjectURL(url)
+          setImageDownloading(false)
+          console.log('이미지 다운로드 완료')
+        }, 100)
+      }, 'image/png', 0.95)
+    } catch (err) {
+      console.error('이미지 저장 오류:', err)
+      setError(`이미지 저장에 실패했어요: ${err.message}. 다시 시도해주세요! 📸`)
+      setImageDownloading(false)
+    }
+  }
+
   // 학습 정리 제출 및 AI 피드백 받기
   const handleLearningSummarySubmit = async (e) => {
     e.preventDefault()
@@ -389,46 +481,30 @@ function App() {
 - AI가 정한 예산: ${Number(budget).toLocaleString()}원
 - 학생이 선택한 평가 기준: ${criteriaList}
 
-**[학생이 제출한 합리적 선택의 정의]**
-- 정의(A): "${answerA}"
-- 이유(B): "${answerB}"
+**[학생이 말한 내용]**
+- 합리적 선택이란: "${answerA}"
+- 그 이유: "${answerB}"
 
-**[분석 요청]**
-위 정의와 이유를 분석하여, 아래 3가지를 반드시 포함한 피드백을 작성해주세요:
+**[피드백 작성 요청]**
+위 내용을 읽고, 아래 3가지를 자연스럽게 담아서 4학년 학생에게 말하듯이 피드백을 작성해주세요:
 
-1. 학생이 쓴 핵심 단어("${answerA}", "${answerB}")를 반드시 따옴표로 인용해서 언급
-2. 정의(A)와 이유(B)가 논리적으로 잘 연결되었는지 구체적으로 평가
-3. 이번 ${item} 쇼핑 체험(예산 ${Number(budget).toLocaleString()}원, 평가 기준 ${criteriaList})과 연결 지어 설명
+1. 학생이 직접 쓴 표현("${answerA}", "${answerB}")을 따옴표로 인용하면서 이야기하기
+2. 학생이 말한 '합리적 선택'과 '이유'가 서로 잘 이어지는지 구체적으로 평가하기
+3. 이번 ${item} 쇼핑 체험(예산 ${Number(budget).toLocaleString()}원, 평가 기준 ${criteriaList})과 연결해서 설명하기
 
-**[피드백 작성 규칙]**
+**[말투 규칙]**
 - 3-4문장으로 작성
-- "잘했어", "멋져" 같은 상투적인 칭찬은 절대 금지
-- 학생의 표현을 직접 인용하면서 구체적으로 분석할 것
-- 교과서 핵심 용어('합리적 선택', '절약', '만족감', '선택 기준')를 적극 활용할 것
-- 어려운 전문 용어('기회비용', '효용', '소비 성향' 등)는 사용 금지. 대신 쉬운 말로 풀어서 설명할 것`
+- "잘했어", "멋져" 같은 막연한 칭찬 대신, 구체적으로 어떤 점이 좋은지 말해주기
+- 교과서 용어('합리적 선택', '절약', '만족감', '선택 기준')를 자연스럽게 섞어서 사용하기
+- 어려운 말('기회비용', '효용', '소비 성향')은 쓰지 말고, "아쉽게 포기한 다른 물건"처럼 쉽게 풀어서 말하기
+- "정의(A)", "이유(B)" 같은 어색한 표현은 절대 사용하지 말기`
 
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
-            content: `당신은 4학년 사회 선생님입니다. 학생이 내린 '합리적 선택의 정의(A)'와 '이유(B)'를 분석해서 피드백을 주세요.
-
-**필수 포함 내용:**
-1. 학생이 쓴 핵심 단어(A, B)를 반드시 따옴표로 인용해서 언급할 것
-2. 정의(A)와 이유(B)가 논리적으로 잘 연결되었는지 평가할 것
-3. 이번 쇼핑 체험(선택한 물건, 예산, 평가 기준)과 연결 지어 설명할 것
-
-**용어 사용 규칙:**
-- ✅ 사용 허용 (적극 권장): '합리적 선택', '절약', '만족감', '선택 기준'
-- ❌ 사용 금지: '기회비용', '효용', '소비 성향', '매몰비용' 등 어려운 전문 용어
-- 대체 표현: '기회비용' → "아쉽게 포기한 다른 물건", '효용' → "만족감", '예산 제약' → "가진 돈 안에서"
-
-**피드백 말투 예시:**
-- (좋은 예): "'나에게 가장 큰 만족감을 주는 것을 고르는 것'이라고 정의했구나! 맞아, 단순히 돈을 '절약'하는 것보다 내 마음에 쏙 드는 걸 찾는 게 진정한 '합리적 선택'이지! 네가 쓴 '오래오래 기분 좋게 쓸 수 있으니까'라는 이유도 아주 정확해."
-- (나쁜 예): "정말 멋진 정의야! 참 잘했어. 앞으로도 합리적인 소비자가 되렴." (이런 막연한 칭찬 금지)
-
-교과서 핵심 용어를 섞어서 전문적인 느낌을 주되, 말투는 여전히 친절하고 쉬워야 합니다.`
+            content: '당신은 초등학교 4학년 사회 선생님입니다. 학생이 말한 "합리적 선택이란 무엇인지"와 "그 이유"를 듣고, 자연스럽게 피드백을 주세요.\n\n**피드백에 꼭 담을 내용:**\n1. 학생이 직접 쓴 표현을 따옴표로 인용하면서 이야기하기\n2. 학생이 말한 "합리적 선택"과 "이유"가 서로 잘 이어지는지 구체적으로 이야기하기\n3. 오늘 쇼핑 체험(선택한 물건, 예산, 평가 기준)과 연결해서 설명하기\n\n**사용할 말:**\n- [허용] 자주 써주세요: "합리적 선택", "절약", "만족감", "선택 기준"\n- [금지] 절대 쓰지 마세요: "기회비용", "효용", "소비 성향", "매몰비용", "정의(A)", "이유(B)" 같은 어색한 표현\n- [대체] 쉽게 풀어 말하기: "기회비용" 대신 "아쉽게 포기한 다른 물건", "효용" 대신 "만족감", "예산 제약" 대신 "가진 돈 안에서"\n\n**말투 예시:**\n[좋은 예]\n"네가 말한 표현을 보니, 단순히 돈을 절약하는 것보다 내 마음에 쏙 드는 걸 찾는 게 진짜 합리적 선택이라는 걸 잘 알고 있구나! 네가 오늘 비싼 물건 대신 튼튼한 물건을 골랐던 순간이 딱 떠오르네."\n\n[나쁜 예]\n"정말 멋진 정의야! 참 잘했어. 앞으로도 합리적인 소비자가 되렴."\n\n교과서 용어를 자연스럽게 섞되, 4학년 학생에게 직접 말하듯이 친근하게 써주세요.'
           },
           {
             role: 'user',
@@ -466,28 +542,28 @@ function App() {
       {/* 진행 바 */}
       {getCurrentStep() > 1 && <ProgressBar currentStep={getCurrentStep()} totalSteps={6} />}
       
-      <div className="flex flex-col items-center gap-6 p-8 pt-32 pb-16">
+      <div className="flex flex-col items-center gap-4 md:gap-6 p-4 md:p-8 pt-24 md:pt-32 pb-8 md:pb-16">
         {/* 메인 제목 */}
         {!options && !showLearningSummary && (
-          <h1 className="text-6xl md:text-7xl font-black text-purple-600 drop-shadow-lg mb-4 sticker border-purple-400 px-8 py-4 rounded-3xl">
+          <h1 className="text-3xl md:text-6xl lg:text-7xl font-black text-purple-600 drop-shadow-lg mb-2 md:mb-4 sticker border-purple-400 px-4 md:px-8 py-3 md:py-4 rounded-2xl md:rounded-3xl">
             합리적 선택하기 🛒
           </h1>
         )}
 
         {/* 1단계: 입력 폼 */}
         {!showCriteriaSelection && !options && !loading && (
-          <div className="w-full max-w-3xl">
+          <div className="w-full max-w-3xl px-2">
             <AIGuide 
               message="어떤 물건을 사고 싶니? 아래에 물건 이름을 써봐!" 
               emoji="🤗"
             />
             
             <form onSubmit={handleSubmit}>
-              <div className="bg-white rounded-3xl shadow-2xl p-10 space-y-8 border-4 border-pink-200">
+              <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-10 space-y-6 md:space-y-8 border-4 border-pink-200">
                 {/* 물건 입력창 */}
-                <div className="space-y-4">
-                  <label className="flex items-center gap-2 text-2xl font-black text-gray-800">
-                    <span className="text-3xl">🎁</span>
+                <div className="space-y-3 md:space-y-4">
+                  <label className="flex items-center gap-2 text-lg md:text-2xl font-black text-gray-800">
+                    <span className="text-2xl md:text-3xl">🎁</span>
                     사고 싶은 물건
                   </label>
                   <input
@@ -495,19 +571,19 @@ function App() {
                     value={item}
                     onChange={(e) => setItem(e.target.value)}
                     placeholder="예) 필통, 스티커, 인형..."
-                    className="w-full px-8 py-5 text-2xl rounded-2xl border-4 border-yellow-300 focus:border-pink-400 focus:outline-none focus:ring-4 focus:ring-pink-200 transition-all font-bold"
+                    className="w-full px-4 md:px-8 py-3 md:py-5 text-lg md:text-2xl rounded-xl md:rounded-2xl border-4 border-yellow-300 focus:border-pink-400 focus:outline-none focus:ring-4 focus:ring-pink-200 transition-all font-bold min-h-[44px]"
                   />
                 </div>
 
                 {/* AI 예산 설정 안내 스티커 */}
-                <div className="sticker border-blue-300 rounded-2xl p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="text-4xl">🤖</div>
+                <div className="sticker border-blue-300 rounded-xl md:rounded-2xl p-4 md:p-6">
+                  <div className="flex items-start gap-2 md:gap-4">
+                    <div className="text-2xl md:text-4xl flex-shrink-0">🤖</div>
       <div>
-                      <p className="text-xl font-bold text-gray-800 mb-2">
+                      <p className="text-base md:text-xl font-bold text-gray-800 mb-1 md:mb-2">
                         💰 AI가 예산을 정해줄게요!
                       </p>
-                      <p className="text-lg text-gray-700">
+                      <p className="text-sm md:text-lg text-gray-700">
                         실제 상황처럼 정해진 예산 안에서<br />
                         어떻게 쓸지 고민해보세요 💡
                       </p>
@@ -519,7 +595,7 @@ function App() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bubble-button w-full bg-gradient-to-r from-yellow-400 to-orange-400 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bubble-button w-full bg-gradient-to-r from-yellow-400 to-orange-400 text-white disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg md:text-xl"
                 >
                   시작하기!
                 </button>
@@ -530,22 +606,22 @@ function App() {
 
         {/* 2단계: 평가 기준 선택 */}
         {showCriteriaSelection && !loading && (
-          <div className="w-full max-w-5xl">
+          <div className="w-full max-w-5xl px-2">
             <AIGuide 
-              message={`'${item}'을(를) 고를 때 무엇이 중요한지 기준 3가지를 선택해봐!`}
+              message={item + '을(를) 고를 때 무엇이 중요한지 기준 3가지를 선택해봐!'}
               emoji="🎯"
             />
             
-            <div className="bg-white rounded-3xl shadow-2xl p-10 border-4 border-blue-200">
+            <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-10 border-4 border-blue-200">
               {/* 예산 스티커 */}
-              <div className="sticker border-green-400 rounded-2xl p-6 mb-8">
-                <div className="flex items-center justify-center gap-4">
-                  <div className="text-5xl">💰</div>
+              <div className="sticker border-green-400 rounded-xl md:rounded-2xl p-4 md:p-6 mb-6 md:mb-8">
+                <div className="flex items-center justify-center gap-2 md:gap-4">
+                  <div className="text-3xl md:text-5xl">💰</div>
                   <div className="text-center">
-                    <p className="text-xl font-bold text-gray-700 mb-1">
+                    <p className="text-base md:text-xl font-bold text-gray-700 mb-1">
                       AI가 정해준 예산
                     </p>
-                    <p className="text-4xl font-black text-green-600">
+                    <p className="text-2xl md:text-4xl font-black text-green-600">
                       {Number(budget).toLocaleString()}원
                     </p>
                   </div>
@@ -553,24 +629,24 @@ function App() {
               </div>
 
               {/* 선택된 기준 표시 */}
-              <div className="mb-8 p-6 bg-gradient-to-r from-purple-100 to-pink-100 rounded-3xl border-3 border-purple-300">
-                <p className="text-2xl font-black text-gray-800 mb-4 text-center">
+              <div className="mb-6 md:mb-8 p-4 md:p-6 bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl md:rounded-3xl border-3 border-purple-300">
+                <p className="text-lg md:text-2xl font-black text-gray-800 mb-3 md:mb-4 text-center">
                   ✨ 선택된 기준 ({selectedCriteria.length}/3)
                 </p>
-                <div className="flex flex-wrap gap-4 justify-center min-h-[80px] items-center">
+                <div className="flex flex-wrap gap-2 md:gap-4 justify-center min-h-[60px] md:min-h-[80px] items-center">
                   {selectedCriteria.length === 0 ? (
-                    <p className="text-xl text-gray-500">아래에서 3가지 기준을 선택해주세요!</p>
+                    <p className="text-base md:text-xl text-gray-500">아래에서 3가지 기준을 선택해주세요!</p>
                   ) : (
                     selectedCriteria.map((criterion) => (
                       <div
                         key={criterion.id}
-                        className="sticker border-purple-400 px-6 py-4 rounded-2xl text-2xl font-black text-purple-600 flex items-center gap-3"
+                        className="sticker border-purple-400 px-3 md:px-6 py-2 md:py-4 rounded-xl md:rounded-2xl text-base md:text-2xl font-black text-purple-600 flex items-center gap-2 md:gap-3"
                       >
-                        <span className="text-3xl">{criterion.emoji}</span>
+                        <span className="text-xl md:text-3xl">{criterion.emoji}</span>
                         <span>{criterion.label.replace(/^[^\s]+\s/, '')}</span>
                         <button
                           onClick={() => toggleCriterion(criterion)}
-                          className="ml-2 text-2xl text-red-500 hover:scale-125 transition-transform"
+                          className="ml-1 md:ml-2 text-lg md:text-2xl text-red-500 hover:scale-125 transition-transform min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                           ✕
                         </button>
@@ -581,12 +657,12 @@ function App() {
               </div>
 
               {/* AI 추천 기준 버튼들 */}
-              <div className="space-y-5 mb-8">
-                <p className="text-2xl font-black text-gray-800 text-center flex items-center justify-center gap-2">
-                  <span className="text-3xl">💡</span>
+              <div className="space-y-4 md:space-y-5 mb-6 md:mb-8">
+                <p className="text-lg md:text-2xl font-black text-gray-800 text-center flex items-center justify-center gap-2">
+                  <span className="text-2xl md:text-3xl">💡</span>
                   AI가 추천하는 기준
                 </p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5">
                   {suggestedCriteria.map((criterion) => {
                     const isSelected = selectedCriteria.find(c => c.id === criterion.id)
                     return (
@@ -594,11 +670,10 @@ function App() {
                         key={criterion.id}
                         onClick={() => toggleCriterion(criterion)}
                         disabled={!isSelected && selectedCriteria.length >= 3}
-                        className={`bubble-button text-2xl ${
-                          isSelected
+                        className={'bubble-button text-base md:text-2xl min-h-[44px] ' + (isSelected
                             ? 'bg-gradient-to-r from-purple-400 to-pink-400 text-white scale-105'
                             : 'bg-gradient-to-r from-yellow-300 to-orange-300 text-gray-800'
-                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        ) + ' disabled:opacity-50 disabled:cursor-not-allowed'}
                       >
                         {criterion.label}
                       </button>
@@ -608,12 +683,12 @@ function App() {
               </div>
 
               {/* 직접 입력 */}
-              <div className="space-y-4 mb-8">
-                <p className="text-2xl font-black text-gray-800 text-center flex items-center justify-center gap-2">
-                  <span className="text-3xl">✏️</span>
+              <div className="space-y-3 md:space-y-4 mb-6 md:mb-8">
+                <p className="text-lg md:text-2xl font-black text-gray-800 text-center flex items-center justify-center gap-2">
+                  <span className="text-2xl md:text-3xl">✏️</span>
                   추가하고 싶은 기준이 있나요?
                 </p>
-                <div className="flex gap-4">
+                <div className="flex flex-col md:flex-row gap-3 md:gap-4">
                   <input
                     type="text"
                     value={customCriterion}
@@ -621,12 +696,12 @@ function App() {
                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomCriterion())}
                     placeholder="예) 무게, 배터리, 소음..."
                     disabled={selectedCriteria.length >= 3}
-                    className="flex-1 px-8 py-5 text-2xl rounded-2xl border-4 border-yellow-300 focus:border-pink-400 focus:outline-none focus:ring-4 focus:ring-pink-200 transition-all disabled:opacity-50 font-bold"
+                    className="flex-1 px-4 md:px-8 py-3 md:py-5 text-base md:text-2xl rounded-xl md:rounded-2xl border-4 border-yellow-300 focus:border-pink-400 focus:outline-none focus:ring-4 focus:ring-pink-200 transition-all disabled:opacity-50 font-bold min-h-[44px]"
                   />
                   <button
                     onClick={addCustomCriterion}
                     disabled={!customCriterion.trim() || selectedCriteria.length >= 3}
-                    className="bubble-button bg-gradient-to-r from-sky-400 to-blue-400 text-white text-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bubble-button bg-gradient-to-r from-sky-400 to-blue-400 text-white text-base md:text-xl disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
                   >
                     추가 ➕
                   </button>
@@ -638,9 +713,9 @@ function App() {
                 <button
                   onClick={fetchOptions}
                   disabled={selectedCriteria.length !== 3}
-                  className="bubble-button bg-gradient-to-r from-green-400 to-emerald-500 text-white text-2xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bubble-button w-full md:w-auto bg-gradient-to-r from-green-400 to-emerald-500 text-white text-lg md:text-2xl disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
                 >
-                  {selectedCriteria.length === 3 ? '확인! AI에게 물어보기 ✨' : `${3 - selectedCriteria.length}개 더 선택해주세요!`}
+                  {selectedCriteria.length === 3 ? '확인! AI에게 물어보기 ✨' : (3 - selectedCriteria.length) + '개 더 선택해주세요!'}
                 </button>
               </div>
             </div>
@@ -649,63 +724,63 @@ function App() {
 
         {/* 3단계: 로딩 상태 */}
         {loading && (
-          <div className="w-full max-w-4xl">
-            <div className="bg-white rounded-3xl shadow-2xl p-12 border-4 border-purple-200">
-              <div className="flex flex-col items-center gap-8">
-                <div className="text-9xl animate-bounce">
+          <div className="w-full max-w-4xl px-2">
+            <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl p-6 md:p-12 border-4 border-purple-200">
+              <div className="flex flex-col items-center gap-4 md:gap-8">
+                <div className="text-6xl md:text-9xl animate-bounce">
                   {!options ? '💰' : '🔍'}
                 </div>
-                <div className="space-y-4 w-full">
-                  <p className="text-4xl font-black text-gray-800 text-center">
-                    {!options ? `"${item}"에 맞는 예산을 정하는 중...` : 'AI가 인터넷을 뒤지는 중...'}
+                <div className="space-y-3 md:space-y-4 w-full">
+                  <p className="text-xl md:text-4xl font-black text-gray-800 text-center">
+                    {!options ? item + '에 맞는 예산을 정하는 중...' : 'AI가 인터넷을 뒤지는 중...'}
                   </p>
                   {!options ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4 text-xl font-bold text-gray-700">
-                        <span className="text-3xl">🤖</span>
-                        <span>물건 종류 분석 중...</span>
-                        <div className="flex-1 bg-gray-200 rounded-full h-4 overflow-hidden">
+                    <div className="space-y-3 md:space-y-4">
+                      <div className="flex items-center gap-2 md:gap-4 text-sm md:text-xl font-bold text-gray-700">
+                        <span className="text-xl md:text-3xl flex-shrink-0">🤖</span>
+                        <span className="flex-shrink-0">물건 종류 분석 중...</span>
+                        <div className="flex-1 bg-gray-200 rounded-full h-3 md:h-4 overflow-hidden">
                           <div className="bg-gradient-to-r from-purple-400 to-pink-600 h-full animate-pulse w-3/4 rounded-full"></div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 text-xl font-bold text-gray-700">
-                        <span className="text-3xl">💰</span>
-                        <span>적절한 예산 계산 중...</span>
-                        <div className="flex-1 bg-gray-200 rounded-full h-4 overflow-hidden">
+                      <div className="flex items-center gap-2 md:gap-4 text-sm md:text-xl font-bold text-gray-700">
+                        <span className="text-xl md:text-3xl flex-shrink-0">💰</span>
+                        <span className="flex-shrink-0">적절한 예산 계산 중...</span>
+                        <div className="flex-1 bg-gray-200 rounded-full h-3 md:h-4 overflow-hidden">
                           <div className="bg-gradient-to-r from-green-400 to-emerald-600 h-full animate-pulse w-2/3 rounded-full"></div>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4 text-xl font-bold text-gray-700">
-                        <span className="text-3xl">🛒</span>
-                        <span>쇼핑몰 검색 중...</span>
-                        <div className="flex-1 bg-gray-200 rounded-full h-4 overflow-hidden">
+                    <div className="space-y-3 md:space-y-4">
+                      <div className="flex items-center gap-2 md:gap-4 text-sm md:text-xl font-bold text-gray-700">
+                        <span className="text-xl md:text-3xl flex-shrink-0">🛒</span>
+                        <span className="flex-shrink-0">쇼핑몰 검색 중...</span>
+                        <div className="flex-1 bg-gray-200 rounded-full h-3 md:h-4 overflow-hidden">
                           <div className="bg-gradient-to-r from-blue-400 to-blue-600 h-full animate-pulse w-3/4 rounded-full"></div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 text-xl font-bold text-gray-700">
-                        <span className="text-3xl">💰</span>
-                        <span>가격 비교 중...</span>
-                        <div className="flex-1 bg-gray-200 rounded-full h-4 overflow-hidden">
+                      <div className="flex items-center gap-2 md:gap-4 text-sm md:text-xl font-bold text-gray-700">
+                        <span className="text-xl md:text-3xl flex-shrink-0">💰</span>
+                        <span className="flex-shrink-0">가격 비교 중...</span>
+                        <div className="flex-1 bg-gray-200 rounded-full h-3 md:h-4 overflow-hidden">
                           <div className="bg-gradient-to-r from-green-400 to-green-600 h-full animate-pulse w-2/3 rounded-full"></div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 text-xl font-bold text-gray-700">
-                        <span className="text-3xl">⭐</span>
-                        <span>리뷰 분석 중...</span>
-                        <div className="flex-1 bg-gray-200 rounded-full h-4 overflow-hidden">
+                      <div className="flex items-center gap-2 md:gap-4 text-sm md:text-xl font-bold text-gray-700">
+                        <span className="text-xl md:text-3xl flex-shrink-0">⭐</span>
+                        <span className="flex-shrink-0">리뷰 분석 중...</span>
+                        <div className="flex-1 bg-gray-200 rounded-full h-3 md:h-4 overflow-hidden">
                           <div className="bg-gradient-to-r from-yellow-400 to-orange-600 h-full animate-pulse w-1/2 rounded-full"></div>
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
-                <div className="flex gap-3 mt-6">
-                  <div className="w-4 h-4 bg-purple-500 rounded-full animate-bounce" style={{animationDelay: '0s'}}></div>
-                  <div className="w-4 h-4 bg-pink-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                  <div className="w-4 h-4 bg-yellow-500 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
+                <div className="flex gap-2 md:gap-3 mt-4 md:mt-6">
+                  <div className="w-3 h-3 md:w-4 md:h-4 bg-purple-500 rounded-full animate-bounce" style={{animationDelay: '0s'}}></div>
+                  <div className="w-3 h-3 md:w-4 md:h-4 bg-pink-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                  <div className="w-3 h-3 md:w-4 md:h-4 bg-yellow-500 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
                 </div>
               </div>
             </div>
@@ -714,113 +789,113 @@ function App() {
 
         {/* 에러 메시지 */}
         {error && (
-          <div className="sticker border-red-400 rounded-3xl shadow-2xl p-10 max-w-2xl w-full">
-            <div className="flex items-center gap-4 justify-center">
-              <span className="text-5xl">⚠️</span>
-              <p className="text-2xl font-black text-red-600 text-center">{error}</p>
+          <div className="sticker border-red-400 rounded-2xl md:rounded-3xl shadow-2xl p-6 md:p-10 max-w-2xl w-full px-2">
+            <div className="flex items-center gap-2 md:gap-4 justify-center">
+              <span className="text-3xl md:text-5xl flex-shrink-0">⚠️</span>
+              <p className="text-base md:text-2xl font-black text-red-600 text-center">{error}</p>
             </div>
           </div>
         )}
 
         {/* 4단계: 결과 카드 */}
         {options && !loading && (
-          <div className="w-full max-w-7xl">
+          <div className="w-full max-w-7xl px-2">
             <AIGuide 
               message="AI가 찾아온 3가지 선택지야! 아래에서 각 물건을 별점으로 평가해봐!"
               emoji="🎁"
             />
             
             {/* 기준 안내 스티커 */}
-            <div className="sticker border-blue-300 rounded-2xl p-6 mb-8 max-w-4xl mx-auto">
-              <div className="flex items-center justify-center gap-4 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span className="text-3xl">✨</span>
-                  <span className="text-2xl font-black text-gray-800">평가 기준:</span>
-                  <span className="text-2xl font-black text-purple-600">
+            <div className="sticker border-blue-300 rounded-xl md:rounded-2xl p-4 md:p-6 mb-6 md:mb-8 max-w-4xl mx-auto">
+              <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap justify-center">
+                  <span className="text-2xl md:text-3xl">✨</span>
+                  <span className="text-base md:text-2xl font-black text-gray-800">평가 기준:</span>
+                  <span className="text-base md:text-2xl font-black text-purple-600">
                     {selectedCriteria.map(c => c.label.replace(/^[^\s]+\s/, '')).join(', ')}
                   </span>
                 </div>
-                <div className="sticker border-green-400 rounded-xl px-4 py-2">
-                  <span className="text-2xl font-black text-green-600">
+                <div className="sticker border-green-400 rounded-xl px-3 md:px-4 py-2">
+                  <span className="text-base md:text-2xl font-black text-green-600">
                     💰 예산: {Number(budget).toLocaleString()}원
                   </span>
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
               {options.map((option, index) => (
                 <div
                   key={index}
                   className="bg-white rounded-3xl shadow-2xl overflow-hidden hover-scale-102 transform transition-all duration-200 border-4 border-gray-200"
                 >
                   {/* 상단 헤더 */}
-                  <div className={`p-5 ${
+                  <div className={'p-3 md:p-5 ' + (
                     index === 0 ? 'bg-gradient-to-r from-yellow-100 to-amber-100 border-b-4 border-yellow-300' :
                     index === 1 ? 'bg-gradient-to-r from-blue-100 to-sky-100 border-b-4 border-blue-300' :
                     'bg-gradient-to-r from-pink-100 to-purple-100 border-b-4 border-pink-300'
-                  }`}>
+                  )}>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-5xl">
+                      <div className="flex items-center gap-2 md:gap-3">
+                        <span className="text-3xl md:text-5xl">
                           {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
                         </span>
-                        <span className="text-2xl font-black text-gray-800">
+                        <span className="text-lg md:text-2xl font-black text-gray-800">
                           대안 {index + 1}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border-2 border-yellow-300">
-                        <span className="text-2xl">⭐</span>
-                        <span className="text-lg font-black">4.{Math.floor(Math.random() * 3) + 3}</span>
+                      <div className="flex items-center gap-1 md:gap-2 bg-white px-2 md:px-4 py-1 md:py-2 rounded-full border-2 border-yellow-300">
+                        <span className="text-xl md:text-2xl">⭐</span>
+                        <span className="text-sm md:text-lg font-black">4.{Math.floor(Math.random() * 3) + 3}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* 상품 내용 */}
-                  <div className="p-8 space-y-6">
-                    <h3 className="text-3xl font-black text-gray-800">
+                  <div className="p-4 md:p-8 space-y-4 md:space-y-6">
+                    <h3 className="text-xl md:text-3xl font-black text-gray-800">
                       {option.name}
                     </h3>
                     
                     {/* 가격 정보 스티커 */}
-                    <div className={`sticker rounded-2xl p-5 ${
+                    <div className={'sticker rounded-xl md:rounded-2xl p-3 md:p-5 ' + (
                       option.price > Number(budget) ? 'border-red-400' : 'border-green-400'
-                    }`}>
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-xl font-bold text-gray-700">💳 판매가</span>
-                        <span className={`text-4xl font-black ${
+                    )}>
+                      <div className="flex items-center justify-between mb-2 md:mb-3">
+                        <span className="text-base md:text-xl font-bold text-gray-700">💳 판매가</span>
+                        <span className={'text-2xl md:text-4xl font-black ' + (
                           option.price > Number(budget) ? 'text-red-600' : 'text-green-600'
-                        }`}>
+                        )}>
                           {option.price.toLocaleString()}원
                         </span>
                       </div>
                       {option.price > Number(budget) ? (
-                        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 text-center">
-                          <p className="text-lg text-red-700 font-black">⚠️ 예산 {(option.price - Number(budget)).toLocaleString()}원 초과</p>
+                        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-2 md:p-3 text-center">
+                          <p className="text-sm md:text-lg text-red-700 font-black">⚠️ 예산 {(option.price - Number(budget)).toLocaleString()}원 초과</p>
                         </div>
                       ) : (
-                        <div className="bg-green-50 border-2 border-green-300 rounded-xl p-3 text-center">
-                          <p className="text-lg text-green-700 font-black">✅ 예산 내 구매 가능</p>
+                        <div className="bg-green-50 border-2 border-green-300 rounded-xl p-2 md:p-3 text-center">
+                          <p className="text-sm md:text-lg text-green-700 font-black">✅ 예산 내 구매 가능</p>
                         </div>
                       )}
                     </div>
 
                     {/* 특징 */}
-                    <div className="space-y-3">
-                      <p className="text-xl font-black text-gray-800 flex items-center gap-2">
-                        <span className="text-2xl">📋</span> 상품 특징
+                    <div className="space-y-2 md:space-y-3">
+                      <p className="text-base md:text-xl font-black text-gray-800 flex items-center gap-2">
+                        <span className="text-xl md:text-2xl">📋</span> 상품 특징
                       </p>
-                      <p className="text-base text-gray-600 leading-relaxed bg-blue-50 p-4 rounded-xl whitespace-pre-line">
+                      <p className="text-sm md:text-base text-gray-600 leading-relaxed bg-blue-50 p-3 md:p-4 rounded-xl whitespace-pre-line">
                         {option.features}
                       </p>
                     </div>
 
                     {/* 배송 정보 스티커 */}
-                    <div className="flex items-center justify-between text-base font-bold border-t-2 border-gray-200 pt-4">
-                      <span className="flex items-center gap-2 text-blue-600">
-                        <span className="text-2xl">🚚</span> 무료배송
+                    <div className="flex items-center justify-between text-sm md:text-base font-bold border-t-2 border-gray-200 pt-3 md:pt-4">
+                      <span className="flex items-center gap-1 md:gap-2 text-blue-600">
+                        <span className="text-xl md:text-2xl">🚚</span> 무료배송
                       </span>
-                      <span className="flex items-center gap-2 text-orange-600">
-                        <span className="text-2xl">📦</span> 오늘출발
+                      <span className="flex items-center gap-1 md:gap-2 text-orange-600">
+                        <span className="text-xl md:text-2xl">📦</span> 오늘출발
                       </span>
                     </div>
                   </div>
@@ -829,41 +904,90 @@ function App() {
             </div>
 
             {/* 의사결정 표 */}
-            <div className="mt-12">
-              <div className="sticker border-purple-400 rounded-3xl p-6 mb-8 max-w-4xl mx-auto">
-                <p className="text-2xl text-center font-black text-gray-800">
-                  <span className="text-3xl">📊</span>{' '}
+            <div className="mt-8 md:mt-12">
+              <div className="sticker border-purple-400 rounded-2xl md:rounded-3xl p-4 md:p-6 mb-6 md:mb-8 max-w-4xl mx-auto">
+                <p className="text-base md:text-2xl text-center font-black text-gray-800">
+                  <span className="text-2xl md:text-3xl">📊</span>{' '}
                   <span className="text-purple-600">내가 선택한 평가 기준:</span>{' '}
                   {selectedCriteria.map((c, idx) => (
                     <span key={c.id}>
-                      <span className="text-2xl">{c.emoji}</span> <span className="font-black">{c.label.replace(/^[^\s]+\s/, '')}</span>
+                      <span className="text-xl md:text-2xl">{c.emoji}</span> <span className="font-black">{c.label.replace(/^[^\s]+\s/, '')}</span>
                       {idx < selectedCriteria.length - 1 ? ', ' : ''}
                     </span>
                   ))}
                 </p>
               </div>
               
-              <div className="bg-white rounded-3xl shadow-2xl p-8 overflow-x-auto border-4 border-purple-300">
+              {/* 모바일: 세로 배치, 데스크톱: 테이블 */}
+              <div className="md:hidden space-y-6">
+                {[0, 1, 2].map((optionIdx) => (
+                  <div key={optionIdx} className="bg-white rounded-2xl shadow-2xl p-4 border-4 border-purple-300">
+                    <div className="bg-gradient-to-r from-purple-200 via-pink-200 to-yellow-200 rounded-xl p-4 mb-4 text-center">
+                      <div className="text-3xl mb-2">
+                        {optionIdx === 0 ? '🥇' : optionIdx === 1 ? '🥈' : '🥉'}
+                      </div>
+                      <div className="text-lg font-black text-gray-800">대안 {optionIdx + 1}</div>
+                      <div className="text-sm font-bold text-gray-700 mt-1">{options[optionIdx].name}</div>
+                    </div>
+                    {selectedCriteria.map((criterion, criterionIdx) => {
+                      const bgColors = ['bg-yellow-50', 'bg-sky-50', 'bg-pink-50']
+                      return (
+                        <div key={criterion.id} className={bgColors[criterionIdx % 3] + ' p-4 mb-3 rounded-xl border-2 border-purple-300'}>
+                          <div className="text-base font-black text-gray-800 mb-3 flex items-center gap-2">
+                            <span className="text-2xl">{criterion.emoji}</span>
+                            {criterion.label.replace(/^[^\s]+\s/, '')}
+                          </div>
+                          <StarRating
+                            rating={ratings[optionIdx][criterion.id] || 0}
+                            onRatingChange={(value) => updateRating(optionIdx, criterion.id, value)}
+                          />
+                        </div>
+                      )
+                    })}
+                    <div className="bg-gradient-to-r from-orange-200 via-yellow-200 to-amber-200 p-4 mb-3 rounded-xl border-2 border-purple-300 text-center">
+                      <div className="text-2xl font-black text-gray-800 mb-2 flex items-center justify-center gap-2">
+                        <span className="text-3xl">🏆</span> 총점
+                      </div>
+                      <div className="text-3xl font-black text-orange-600 mb-1">
+                        {calculateTotal(optionIdx)}점
+                      </div>
+                      <div className="text-sm font-bold text-gray-600">
+                        (최대 {selectedCriteria.length * 5}점)
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleFinalChoice(optionIdx)}
+                      disabled={showLearningSummary}
+                      className="bubble-button w-full bg-gradient-to-r from-green-400 to-emerald-500 text-white text-base disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                    >
+                      이걸로 결정! ✅
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* 데스크톱: 테이블 */}
+              <div className="hidden md:block bg-white rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-8 overflow-x-auto border-4 border-purple-300">
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-gradient-to-r from-purple-200 via-pink-200 to-yellow-200">
-                      <th className="p-6 text-2xl font-black text-gray-800 border-4 border-purple-400 rounded-tl-2xl">
+                      <th className="p-4 md:p-6 text-lg md:text-2xl font-black text-gray-800 border-4 border-purple-400 rounded-tl-2xl">
                         평가 기준 📝
                       </th>
-                      <th className="p-6 text-2xl font-black text-gray-800 border-4 border-purple-400">
-                        <div className="text-4xl mb-2">🥇</div>
+                      <th className="p-4 md:p-6 text-lg md:text-2xl font-black text-gray-800 border-4 border-purple-400">
+                        <div className="text-3xl md:text-4xl mb-2">🥇</div>
                         대안 1<br />
-                        <span className="text-xl font-bold">{options[0].name}</span>
+                        <span className="text-base md:text-xl font-bold">{options[0].name}</span>
                       </th>
-                      <th className="p-6 text-2xl font-black text-gray-800 border-4 border-purple-400">
-                        <div className="text-4xl mb-2">🥈</div>
+                      <th className="p-4 md:p-6 text-lg md:text-2xl font-black text-gray-800 border-4 border-purple-400">
+                        <div className="text-3xl md:text-4xl mb-2">🥈</div>
                         대안 2<br />
-                        <span className="text-xl font-bold">{options[1].name}</span>
+                        <span className="text-base md:text-xl font-bold">{options[1].name}</span>
                       </th>
-                      <th className="p-6 text-2xl font-black text-gray-800 border-4 border-purple-400 rounded-tr-2xl">
-                        <div className="text-4xl mb-2">🥉</div>
+                      <th className="p-4 md:p-6 text-lg md:text-2xl font-black text-gray-800 border-4 border-purple-400 rounded-tr-2xl">
+                        <div className="text-3xl md:text-4xl mb-2">🥉</div>
                         대안 3<br />
-                        <span className="text-xl font-bold">{options[2].name}</span>
+                        <span className="text-base md:text-xl font-bold">{options[2].name}</span>
                       </th>
                     </tr>
                   </thead>
@@ -873,11 +997,11 @@ function App() {
                       const bgColors = ['bg-yellow-50', 'bg-sky-50', 'bg-pink-50']
                       return (
                         <tr key={criterion.id} className={bgColors[criterionIdx % 3]}>
-                          <td className="p-6 text-2xl font-black text-gray-800 border-4 border-purple-400">
-                            <span className="text-3xl">{criterion.emoji}</span> {criterion.label.replace(/^[^\s]+\s/, '')}
+                          <td className="p-4 md:p-6 text-lg md:text-2xl font-black text-gray-800 border-4 border-purple-400">
+                            <span className="text-2xl md:text-3xl">{criterion.emoji}</span> {criterion.label.replace(/^[^\s]+\s/, '')}
                           </td>
                           {[0, 1, 2].map((idx) => (
-                            <td key={idx} className="p-6 border-4 border-purple-400">
+                            <td key={idx} className="p-4 md:p-6 border-4 border-purple-400">
                               <StarRating
                                 rating={ratings[idx][criterion.id] || 0}
                                 onRatingChange={(value) => updateRating(idx, criterion.id, value)}
@@ -890,15 +1014,15 @@ function App() {
 
                     {/* 총점 */}
                     <tr className="bg-gradient-to-r from-orange-200 via-yellow-200 to-amber-200">
-                      <td className="p-6 text-2xl font-black text-gray-800 border-4 border-purple-400">
-                        <span className="text-4xl">🏆</span> 총점
+                      <td className="p-4 md:p-6 text-lg md:text-2xl font-black text-gray-800 border-4 border-purple-400">
+                        <span className="text-3xl md:text-4xl">🏆</span> 총점
                       </td>
                       {[0, 1, 2].map((idx) => (
-                        <td key={idx} className="p-6 border-4 border-purple-400 text-center">
-                          <div className="text-5xl font-black text-orange-600 mb-2">
+                        <td key={idx} className="p-4 md:p-6 border-4 border-purple-400 text-center">
+                          <div className="text-3xl md:text-5xl font-black text-orange-600 mb-2">
                             {calculateTotal(idx)}점
                           </div>
-                          <div className="text-lg font-bold text-gray-600">
+                          <div className="text-sm md:text-lg font-bold text-gray-600">
                             (최대 {selectedCriteria.length * 5}점)
                           </div>
                         </td>
@@ -907,15 +1031,15 @@ function App() {
 
                     {/* 최종 선택 버튼 */}
                     <tr className="bg-gradient-to-r from-green-100 via-emerald-100 to-teal-100">
-                      <td className="p-6 text-2xl font-black text-gray-800 border-4 border-purple-400 rounded-bl-2xl">
-                        <span className="text-4xl">💚</span> 최종 선택
+                      <td className="p-4 md:p-6 text-lg md:text-2xl font-black text-gray-800 border-4 border-purple-400 rounded-bl-2xl">
+                        <span className="text-3xl md:text-4xl">💚</span> 최종 선택
                       </td>
                       {[0, 1, 2].map((idx) => (
-                        <td key={idx} className="p-6 border-4 border-purple-400 text-center">
+                        <td key={idx} className="p-4 md:p-6 border-4 border-purple-400 text-center">
                           <button
                             onClick={() => handleFinalChoice(idx)}
                             disabled={showLearningSummary}
-                            className="bubble-button w-full bg-gradient-to-r from-green-400 to-emerald-500 text-white text-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="bubble-button w-full bg-gradient-to-r from-green-400 to-emerald-500 text-white text-base md:text-xl disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
                           >
                             이걸로 결정! ✅
                           </button>
@@ -927,11 +1051,11 @@ function App() {
               </div>
               
               {/* 안내 메시지 */}
-              <div className="mt-8 sticker border-blue-300 rounded-3xl p-6">
-                <p className="text-2xl text-gray-800 text-center leading-relaxed font-bold">
-                  <span className="text-3xl">💡</span> <span className="font-black">별을 클릭</span>해서 각 대안을 평가해보세요!<br />
+              <div className="mt-6 md:mt-8 sticker border-blue-300 rounded-2xl md:rounded-3xl p-4 md:p-6">
+                <p className="text-base md:text-2xl text-gray-800 text-center leading-relaxed font-bold">
+                  <span className="text-2xl md:text-3xl">💡</span> <span className="font-black">별을 클릭</span>해서 각 대안을 평가해보세요!<br />
                   내가 선택한 <span className="font-black text-purple-600">{selectedCriteria.map(c => c.label.replace(/^[^\s]+\s/, '')).join(', ')}</span> 기준으로 점수를 매겨보세요!<br />
-                  <span className="text-3xl">✨</span> 총점이 높을수록 나에게 더 좋은 선택이에요!
+                  <span className="text-2xl md:text-3xl">✨</span> 총점이 높을수록 나에게 더 좋은 선택이에요!
                 </p>
               </div>
             </div>
@@ -939,22 +1063,22 @@ function App() {
             {/* AI 넛지 팝업 */}
             {showNudge && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-2xl mx-4 border-4 border-orange-400">
-                  <div className="space-y-8">
+                <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl p-6 md:p-10 max-w-2xl w-full mx-4 border-4 border-orange-400">
+                  <div className="space-y-4 md:space-y-8">
                     <div className="text-center">
-                      <div className="text-8xl mb-4 animate-bounce">🤖</div>
-                      <h3 className="text-4xl font-black text-orange-600">
+                      <div className="text-5xl md:text-8xl mb-3 md:mb-4 animate-bounce">🤖</div>
+                      <h3 className="text-2xl md:text-4xl font-black text-orange-600">
                         AI의 조언
                       </h3>
                     </div>
-                    <div className="sticker border-orange-300 rounded-2xl p-8">
-                      <p className="text-2xl font-bold text-gray-800 leading-relaxed whitespace-pre-line text-center">
+                    <div className="sticker border-orange-300 rounded-xl md:rounded-2xl p-4 md:p-8">
+                      <p className="text-base md:text-2xl font-bold text-gray-800 leading-relaxed whitespace-pre-line text-center">
                         {nudgeMessage}
                       </p>
                     </div>
                     <button
                       onClick={() => setShowNudge(false)}
-                      className="bubble-button w-full bg-gradient-to-r from-orange-400 to-red-400 text-white text-2xl"
+                      className="bubble-button w-full bg-gradient-to-r from-orange-400 to-red-400 text-white text-lg md:text-2xl min-h-[44px]"
                     >
                       알겠어요! 다시 생각해볼게요 👍
                     </button>
@@ -966,39 +1090,39 @@ function App() {
             {/* 최종 확인 팝업 */}
             {showFinalCheck && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-2xl mx-4 border-4 border-purple-300">
-                  <div className="space-y-6">
+                <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl p-6 md:p-8 max-w-2xl w-full mx-4 border-4 border-purple-300">
+                  <div className="space-y-4 md:space-y-6">
                     <div className="text-center">
-                      <div className="text-7xl mb-4">🤔</div>
-                      <h3 className="text-3xl font-bold text-purple-600 mb-4">
+                      <div className="text-5xl md:text-7xl mb-3 md:mb-4">🤔</div>
+                      <h3 className="text-xl md:text-3xl font-bold text-purple-600 mb-3 md:mb-4">
                         마지막 확인!
                       </h3>
                     </div>
                     
-                    <div className="bg-purple-50 rounded-2xl p-6 space-y-4">
-                      <p className="text-2xl text-gray-800 font-bold text-center">
+                    <div className="bg-purple-50 rounded-xl md:rounded-2xl p-4 md:p-6 space-y-3 md:space-y-4">
+                      <p className="text-lg md:text-2xl text-gray-800 font-bold text-center">
                         정말 이 물건이 최고의 선택일까?
                       </p>
-                      <p className="text-lg text-gray-700 text-center">
+                      <p className="text-base md:text-lg text-gray-700 text-center">
                         💡 총점이 가장 높은지 마지막으로 확인해봐!
                       </p>
                       
                       {/* 3가지 대안의 총점 비교 */}
-                      <div className="grid grid-cols-3 gap-3 mt-4">
+                      <div className="grid grid-cols-3 gap-2 md:gap-3 mt-3 md:mt-4">
                         {[0, 1, 2].map((idx) => (
-                          <div key={idx} className={`p-4 rounded-xl text-center ${
+                          <div key={idx} className={'p-3 md:p-4 rounded-xl text-center ' + (
                             idx === pendingChoice 
                               ? 'bg-yellow-100 border-4 border-yellow-400' 
                               : 'bg-gray-100'
-                          }`}>
-                            <p className="text-lg font-bold mb-2">
+                          )}>
+                            <p className="text-sm md:text-lg font-bold mb-1 md:mb-2">
                               {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'} 대안 {idx + 1}
                             </p>
-                            <p className="text-3xl font-bold text-purple-600">
+                            <p className="text-xl md:text-3xl font-bold text-purple-600">
                               {calculateTotal(idx)}점
                             </p>
                             {idx === pendingChoice && (
-                              <p className="text-sm text-yellow-700 font-bold mt-2">
+                              <p className="text-xs md:text-sm text-yellow-700 font-bold mt-1 md:mt-2">
                                 👆 선택한 것
                               </p>
                             )}
@@ -1007,16 +1131,16 @@ function App() {
                       </div>
                     </div>
 
-                    <div className="flex gap-4">
+                    <div className="flex flex-col md:flex-row gap-3 md:gap-4">
                       <button
                         onClick={() => setShowFinalCheck(false)}
-                        className="flex-1 px-8 py-4 text-xl font-bold text-gray-700 bg-gray-200 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transform transition-all duration-200"
+                        className="flex-1 px-6 md:px-8 py-3 md:py-4 text-base md:text-xl font-bold text-gray-700 bg-gray-200 rounded-xl md:rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transform transition-all duration-200 min-h-[44px]"
                       >
                         다시 생각하기 🔄
                       </button>
                       <button
                         onClick={confirmFinalChoice}
-                        className="flex-1 px-8 py-4 text-xl font-bold text-white bg-gradient-to-r from-purple-400 to-pink-400 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transform transition-all duration-200"
+                        className="flex-1 px-6 md:px-8 py-3 md:py-4 text-base md:text-xl font-bold text-white bg-gradient-to-r from-purple-400 to-pink-400 rounded-xl md:rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transform transition-all duration-200 min-h-[44px]"
                       >
                         네, 이걸로 결정! ✅
                       </button>
@@ -1029,45 +1153,45 @@ function App() {
             {/* 예산 초과 경고 팝업 */}
             {showBudgetWarning && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-2xl mx-4 border-4 border-red-400">
-                  <div className="space-y-6">
+                <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl p-6 md:p-8 max-w-2xl w-full mx-4 border-4 border-red-400">
+                  <div className="space-y-4 md:space-y-6">
                     <div className="text-center">
-                      <div className="text-7xl mb-4 animate-bounce">⚠️</div>
-                      <h3 className="text-4xl font-bold text-red-600 mb-4">
+                      <div className="text-5xl md:text-7xl mb-3 md:mb-4 animate-bounce">⚠️</div>
+                      <h3 className="text-2xl md:text-4xl font-bold text-red-600 mb-3 md:mb-4">
                         구매 불가능!
                       </h3>
                     </div>
                     
-                    <div className="bg-red-50 rounded-2xl p-6 space-y-4">
-                      <p className="text-2xl text-gray-800 font-bold text-center">
+                    <div className="bg-red-50 rounded-xl md:rounded-2xl p-4 md:p-6 space-y-3 md:space-y-4">
+                      <p className="text-lg md:text-2xl text-gray-800 font-bold text-center">
                         가진 돈이 부족해서<br />이 물건을 살 수 없어요! 😢
                       </p>
                       
-                      <div className="bg-white rounded-xl p-4 space-y-2">
-                        <div className="flex justify-between items-center text-lg">
+                      <div className="bg-white rounded-xl p-3 md:p-4 space-y-2">
+                        <div className="flex justify-between items-center text-sm md:text-lg">
                           <span className="font-bold">💰 가진 돈 (예산):</span>
-                          <span className="text-green-600 font-bold text-xl">
+                          <span className="text-green-600 font-bold text-base md:text-xl">
                             {Number(budget).toLocaleString()}원
                           </span>
                         </div>
-                        <div className="flex justify-between items-center text-lg">
+                        <div className="flex justify-between items-center text-sm md:text-lg">
                           <span className="font-bold">💳 선택한 물건 가격:</span>
-                          <span className="text-red-600 font-bold text-xl">
+                          <span className="text-red-600 font-bold text-base md:text-xl">
                             {options[pendingChoice]?.price.toLocaleString()}원
                           </span>
                         </div>
-                        <div className="border-t-2 border-gray-300 pt-2 flex justify-between items-center text-lg">
+                        <div className="border-t-2 border-gray-300 pt-2 flex justify-between items-center text-sm md:text-lg">
                           <span className="font-bold">😭 부족한 금액:</span>
-                          <span className="text-red-700 font-bold text-2xl">
+                          <span className="text-red-700 font-bold text-lg md:text-2xl">
                             {(options[pendingChoice]?.price - Number(budget)).toLocaleString()}원
                           </span>
                         </div>
                       </div>
                       
-                      <div className="bg-yellow-50 rounded-xl p-4 border-2 border-yellow-300">
-                        <p className="text-lg text-yellow-900 text-center">
+                      <div className="bg-yellow-50 rounded-xl p-3 md:p-4 border-2 border-yellow-300">
+                        <p className="text-base md:text-lg text-yellow-900 text-center">
                           💡 <span className="font-bold">합리적 선택</span>은<br />
-                          <span className="text-base">예산 안에서 가장 만족스러운 물건을 고르는 거예요!</span>
+                          <span className="text-sm md:text-base">예산 안에서 가장 만족스러운 물건을 고르는 거예요!</span>
                         </p>
                       </div>
                     </div>
@@ -1075,7 +1199,7 @@ function App() {
                     <div className="flex justify-center">
                       <button
                         onClick={() => setShowBudgetWarning(false)}
-                        className="px-12 py-5 text-2xl font-bold text-white bg-gradient-to-r from-blue-400 to-cyan-500 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transform transition-all duration-200"
+                        className="w-full md:w-auto px-8 md:px-12 py-4 md:py-5 text-base md:text-2xl font-bold text-white bg-gradient-to-r from-blue-400 to-cyan-500 rounded-xl md:rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transform transition-all duration-200 min-h-[44px]"
                       >
                         예산 안에서 다시 선택하기 🔄
                       </button>
@@ -1087,77 +1211,78 @@ function App() {
 
             {/* 학습 정리 화면 */}
             {showLearningSummary && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-gradient-to-br from-green-100 via-emerald-50 to-teal-100 rounded-3xl shadow-2xl p-8 max-w-3xl w-full mx-4 border-4 border-emerald-300">
-                  <div className="space-y-6">
+              <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+                <div className="min-h-full flex items-start justify-center p-4 py-8">
+                  <div className="bg-gradient-to-br from-green-100 via-emerald-50 to-teal-100 rounded-3xl shadow-2xl p-6 md:p-8 max-w-4xl w-full border-4 border-emerald-300 my-auto">
+                    <div className="space-y-6">
                     {/* 제목 */}
                     <div className="text-center">
-                      <h3 className="text-4xl font-bold text-emerald-800 mb-4">
+                      <h3 className="text-2xl md:text-4xl font-bold text-emerald-800 mb-3 md:mb-4">
                         📚 오늘의 쇼핑을 정리해 볼까요? 📚
                       </h3>
-                      <p className="text-xl text-emerald-700">
+                      <p className="text-base md:text-xl text-emerald-700">
                         스스로 생각한 '합리적 선택'의 의미를 써보세요!
                       </p>
                     </div>
 
                     {/* AI 피드백이 없을 때: 문장 완성 폼 */}
                     {!aiFeedback && (
-                      <form onSubmit={handleLearningSummarySubmit} className="space-y-6">
+                      <form onSubmit={handleLearningSummarySubmit} className="space-y-4 md:space-y-6">
                         {/* 문장 완성하기 */}
-                        <div className="bg-white rounded-2xl shadow-inner p-8 border-2 border-emerald-200 space-y-6">
+                        <div className="bg-white rounded-xl md:rounded-2xl shadow-inner p-4 md:p-8 border-2 border-emerald-200 space-y-4 md:space-y-6">
                           {/* 첫 번째 문장 */}
-                          <div className="space-y-3">
-                            <label className="block text-2xl font-bold text-gray-800">
+                          <div className="space-y-2 md:space-y-3">
+                            <label className="block text-lg md:text-2xl font-bold text-gray-800">
                               나에게 합리적 선택이란
                             </label>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3">
                               <input
                                 type="text"
                                 value={answerA}
                                 onChange={(e) => setAnswerA(e.target.value)}
                                 placeholder="여기에 입력하세요"
-                                className="flex-1 px-6 py-4 text-xl border-4 border-emerald-300 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-400 focus:border-emerald-400"
+                                className="flex-1 px-4 md:px-6 py-3 md:py-4 text-base md:text-xl border-4 border-emerald-300 rounded-xl md:rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-400 focus:border-emerald-400 min-h-[44px]"
                                 disabled={feedbackLoading}
                               />
-                              <span className="text-2xl font-bold text-gray-800">(이)다.</span>
+                              <span className="text-lg md:text-2xl font-bold text-gray-800 text-center md:text-left">(이)다.</span>
                             </div>
                           </div>
 
                           {/* 두 번째 문장 */}
-                          <div className="space-y-3">
-                            <label className="block text-2xl font-bold text-gray-800">
+                          <div className="space-y-2 md:space-y-3">
+                            <label className="block text-lg md:text-2xl font-bold text-gray-800">
                               왜냐하면
                             </label>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3">
                               <input
                                 type="text"
                                 value={answerB}
                                 onChange={(e) => setAnswerB(e.target.value)}
                                 placeholder="여기에 입력하세요"
-                                className="flex-1 px-6 py-4 text-xl border-4 border-emerald-300 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-400 focus:border-emerald-400"
+                                className="flex-1 px-4 md:px-6 py-3 md:py-4 text-base md:text-xl border-4 border-emerald-300 rounded-xl md:rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-400 focus:border-emerald-400 min-h-[44px]"
                                 disabled={feedbackLoading}
                               />
-                              <span className="text-2xl font-bold text-gray-800">기 때문이다.</span>
+                              <span className="text-lg md:text-2xl font-bold text-gray-800 text-center md:text-left">기 때문이다.</span>
                             </div>
                           </div>
-      </div>
+                        </div>
 
                         {/* 제출 버튼 */}
                         <div className="flex justify-center">
                           <button
                             type="submit"
                             disabled={feedbackLoading}
-                            className="px-12 py-5 text-2xl font-bold text-white bg-gradient-to-r from-emerald-400 to-teal-500 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transform transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                            className="w-full md:w-auto px-8 md:px-12 py-4 md:py-5 text-base md:text-2xl font-bold text-white bg-gradient-to-r from-emerald-400 to-teal-500 rounded-xl md:rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transform transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 min-h-[44px]"
                           >
                             {feedbackLoading ? (
-                              <span className="flex items-center gap-3">
-                                <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                              <span className="flex items-center justify-center gap-3">
+                                <div className="w-5 h-5 md:w-6 md:h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
                                 AI가 생각 중...
                               </span>
                             ) : (
                               '제출하기 ✅'
                             )}
-        </button>
+                          </button>
                         </div>
                       </form>
                     )}
@@ -1165,64 +1290,173 @@ function App() {
                     {/* AI 피드백 표시 */}
                     {aiFeedback && (
                       <div className="space-y-6">
-                        {/* 학생의 답변 */}
-                        <div className="bg-white rounded-2xl shadow-inner p-6 border-2 border-emerald-200">
-                          <h4 className="text-xl font-bold text-emerald-700 mb-3">✍️ 나의 답변</h4>
-                          <p className="text-xl text-gray-800 leading-relaxed">
-                            나에게 합리적 선택이란 <span className="font-bold text-emerald-600">{answerA}</span>(이)다.<br />
-                            왜냐하면 <span className="font-bold text-emerald-600">{answerB}</span>기 때문이다.
-                          </p>
+                        {/* 공유 카드 */}
+                        <div 
+                          ref={shareCardRef}
+                          className="rounded-3xl shadow-2xl p-8 relative overflow-visible"
+                          style={{ 
+                            minHeight: 'auto',
+                            background: 'linear-gradient(to bottom right, #faf5ff, #fdf2f8, #fefce8)',
+                            border: '4px solid #c084fc'
+                          }}
+                        >
+                          {/* 배경 데코레이션 */}
+                          <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+                            <div className="absolute top-3 left-3 text-5xl">🌟</div>
+                            <div className="absolute top-3 right-3 text-5xl">✨</div>
+                            <div className="absolute bottom-3 left-3 text-5xl">💫</div>
+                            <div className="absolute bottom-3 right-3 text-5xl">⭐</div>
+                          </div>
+
+                          {/* 로고 & 타이틀 */}
+                          <div className="relative text-center mb-6 pb-4" style={{ borderBottom: '4px solid #c084fc' }}>
+                            <div className="flex items-center justify-center gap-3 mb-2">
+                              <span className="text-4xl">🛒</span>
+                              <h4 className="text-3xl font-black" style={{ color: '#9333ea' }}>
+                                합리적 선택하기
+                              </h4>
+                              <span className="text-4xl">💡</span>
+                            </div>
+                            <p className="text-lg font-bold" style={{ color: '#4b5563' }}>
+                              오늘의 학습 결과
+                            </p>
+                          </div>
+
+                          {/* 학생의 답변 */}
+                          <div className="relative bg-white rounded-2xl shadow-lg p-6 mb-5" style={{ border: '3px solid #6ee7b7' }}>
+                            <div className="absolute -top-3 left-4 text-white px-3 py-1 rounded-full font-bold text-base shadow-md" style={{ backgroundColor: '#34d399' }}>
+                              ✍️ 나의 생각
+                            </div>
+                            <div className="mt-3 space-y-3">
+                              <p className="text-lg leading-relaxed" style={{ color: '#1f2937' }}>
+                                나에게 <span className="font-black" style={{ color: '#9333ea' }}>합리적 선택</span>이란
+                              </p>
+                              <p className="text-2xl font-black pl-4" style={{ color: '#059669', borderLeft: '4px solid #34d399' }}>
+                                {answerA}
+                              </p>
+                              <p className="text-lg" style={{ color: '#374151' }}>(이)다.</p>
+                              <div className="h-px my-3" style={{ backgroundColor: '#d1d5db' }}></div>
+                              <p className="text-lg leading-relaxed" style={{ color: '#1f2937' }}>
+                                왜냐하면
+                              </p>
+                              <p className="text-2xl font-black pl-4" style={{ color: '#2563eb', borderLeft: '4px solid #60a5fa' }}>
+                                {answerB}
+                              </p>
+                              <p className="text-lg" style={{ color: '#374151' }}>기 때문이다.</p>
+                            </div>
+                          </div>
+
+                          {/* AI 피드백 */}
+                          <div 
+                            className="relative rounded-2xl shadow-lg p-6"
+                            style={{
+                              background: 'linear-gradient(to bottom right, #fef9c3, #fef3c7)',
+                              border: '3px solid #fbbf24'
+                            }}
+                          >
+                            <div className="absolute -top-3 left-4 text-white px-3 py-1 rounded-full font-bold text-base shadow-md flex items-center gap-2" style={{ backgroundColor: '#f59e0b' }}>
+                              <span className="text-lg">🤖</span>
+                              AI 선생님의 피드백
+                            </div>
+                            <p className="mt-3 text-lg leading-relaxed whitespace-pre-line" style={{ color: '#1f2937' }}>
+                              {aiFeedback}
+                            </p>
+                          </div>
+
+                          {/* 쇼핑 정보 */}
+                          <div className="relative mt-5 rounded-xl p-3" style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)', border: '2px solid #e9d5ff' }}>
+                            <div className="flex flex-wrap items-center justify-center gap-3 text-base font-bold" style={{ color: '#374151' }}>
+                              <span className="flex items-center gap-1">
+                                <span className="text-xl">🎁</span>
+                                <span className="text-sm">선택한 물건:</span> <span style={{ color: '#9333ea' }}>{item}</span>
+                              </span>
+                              <span style={{ color: '#9ca3af' }}>|</span>
+                              <span className="flex items-center gap-1">
+                                <span className="text-xl">💰</span>
+                                <span className="text-sm">예산:</span> <span style={{ color: '#16a34a' }}>{Number(budget).toLocaleString()}원</span>
+                              </span>
+                              <span style={{ color: '#9ca3af' }}>|</span>
+                              <span className="flex items-center gap-1">
+                                <span className="text-xl">📊</span>
+                                <span className="text-sm">평가 기준:</span> <span style={{ color: '#2563eb' }}>{selectedCriteria.map(c => c.label.replace(/^[^\s]+\s/, '')).join(', ')}</span>
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* 하단 날짜 */}
+                          <div className="relative text-center mt-5 pt-3" style={{ borderTop: '2px solid #e9d5ff' }}>
+                            <p className="text-base font-bold" style={{ color: '#6b7280' }}>
+                              📅 {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                            </p>
+                          </div>
                         </div>
 
-                        {/* AI 피드백 */}
-                        <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-2xl shadow-inner p-8 border-2 border-yellow-300">
-                          <h4 className="text-2xl font-bold text-amber-700 mb-4 text-center">
-                            🌟 AI 선생님의 피드백 🌟
-                          </h4>
-                          <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-line">
-                            {aiFeedback}
-                          </p>
-                        </div>
+                        {/* 액션 버튼들 */}
+                        <div className="space-y-3 md:space-y-4">
+                          {/* 이미지 저장 버튼 */}
+                          <div className="text-center">
+                            <button
+                              onClick={handleDownloadImage}
+                              disabled={imageDownloading}
+                              className="bubble-button w-full bg-gradient-to-r from-pink-400 via-purple-400 to-blue-400 text-white text-lg md:text-2xl disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                            >
+                              {imageDownloading ? (
+                                <span className="flex items-center justify-center gap-2 md:gap-3">
+                                  <div className="w-5 h-5 md:w-6 md:h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                                  이미지 생성 중...
+                                </span>
+                              ) : (
+                                '이미지로 저장하기 📸'
+                              )}
+                            </button>
+                            <p className="text-sm md:text-lg text-gray-600 mt-2 md:mt-3 font-bold">
+                              {imageDownloading 
+                                ? '⏳ 잠시만 기다려주세요...' 
+                                : '🔗 버튼을 누르고 나의 결과를 친구들과 공유하자!'}
+                            </p>
+                          </div>
 
-                        {/* 버튼 */}
-                        <div className="flex gap-4 justify-center">
-                          <button
-                            onClick={() => {
-                              setShowLearningSummary(false)
-                              setAiFeedback(null)
-                              setAnswerA('')
-                              setAnswerB('')
-                            }}
-                            className="px-8 py-4 text-xl font-bold text-white bg-gradient-to-r from-emerald-400 to-teal-400 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transform transition-all duration-200"
-                          >
-                            다른 선택 해보기 🔄
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowLearningSummary(false)
-                              setAiFeedback(null)
-                              setAnswerA('')
-                              setAnswerB('')
-                              setOptions(null)
-                              setItem('')
-                              setBudget('')
-                              setShowCriteriaSelection(false)
-                              setSelectedCriteria([])
-                              setRatings({ 0: {}, 1: {}, 2: {} })
-                            }}
-                            className="px-8 py-4 text-xl font-bold text-white bg-gradient-to-r from-purple-400 to-pink-400 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transform transition-all duration-200"
-                          >
-                            처음으로 🏠
-                          </button>
+                          {/* 하단 버튼들 - 세로 배치 */}
+                          <div className="flex flex-col gap-2 md:gap-3">
+                            <button
+                              onClick={() => {
+                                setShowLearningSummary(false)
+                                setAiFeedback(null)
+                                setAnswerA('')
+                                setAnswerB('')
+                              }}
+                              className="bubble-button w-full bg-gradient-to-r from-green-400 to-emerald-500 text-white text-base md:text-xl min-h-[44px]"
+                            >
+                              다른 선택 해보기 🔄
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowLearningSummary(false)
+                                setAiFeedback(null)
+                                setAnswerA('')
+                                setAnswerB('')
+                                setOptions(null)
+                                setItem('')
+                                setBudget('')
+                                setShowCriteriaSelection(false)
+                                setSelectedCriteria([])
+                                setRatings({ 0: {}, 1: {}, 2: {} })
+                              }}
+                              className="bubble-button w-full bg-gradient-to-r from-purple-400 to-pink-400 text-white text-base md:text-xl min-h-[44px]"
+                            >
+                              처음으로 🏠
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
-            <div className="text-center mt-8">
+            <div className="text-center mt-6 md:mt-8 px-2">
               <button
                 onClick={() => {
                   setOptions(null)
@@ -1231,7 +1465,7 @@ function App() {
                   setShowCriteriaSelection(false)
                   setSelectedCriteria([])
                 }}
-                className="px-8 py-4 text-xl font-bold text-white bg-gradient-to-r from-purple-400 to-pink-400 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transform transition-all duration-200"
+                className="w-full md:w-auto px-6 md:px-8 py-3 md:py-4 text-base md:text-xl font-bold text-white bg-gradient-to-r from-purple-400 to-pink-400 rounded-xl md:rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transform transition-all duration-200 min-h-[44px]"
               >
                 다시 골라보기 🔄
               </button>
