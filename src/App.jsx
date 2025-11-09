@@ -384,70 +384,140 @@ function App() {
       await new Promise(resolve => {
         if (document.fonts && document.fonts.ready) {
           document.fonts.ready.then(() => {
-            setTimeout(resolve, 300)
+            setTimeout(resolve, 800)
           })
         } else {
-          setTimeout(resolve, 500)
+          setTimeout(resolve, 1000)
         }
       })
       
-      // 공유 카드의 실제 크기 계산
-      const rect = element.getBoundingClientRect()
+      // 원본 스크롤 위치 저장
+      const originalScrollY = window.scrollY
+      const originalScrollX = window.scrollX
       
-      console.log('이미지 생성 시작:', { width: rect.width, height: rect.height })
+      // 요소를 화면에 완전히 보이게 스크롤
+      element.scrollIntoView({ 
+        behavior: 'instant', 
+        block: 'center',
+        inline: 'center'
+      })
       
+      // 스크롤 후 대기
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      console.log('이미지 생성 시작')
+      
+      // html2canvas로 캡처 (간소화된 설정)
       const canvas = await html2canvas(element, {
         backgroundColor: '#fef3f2',
-        scale: 2,
-        logging: false,
+        scale: 2, // 고정 scale로 안정성 확보
+        logging: true,
         useCORS: true,
-        allowTaint: true, // 로컬 서버에서도 작동하도록 true로 변경
-        foreignObjectRendering: false,
-        removeContainer: false,
-        imageTimeout: 30000,
-        width: rect.width,
-        height: rect.height,
-        x: 0,
-        y: 0,
-        scrollX: -window.scrollX,
-        scrollY: -window.scrollY,
-        windowWidth: window.innerWidth,
-        windowHeight: window.innerHeight
+        allowTaint: true,
+        imageTimeout: 0, // 타임아웃 제거
+        onclone: (clonedDoc) => {
+          // 복제된 문서에서 해당 요소 찾기
+          const clonedElement = clonedDoc.querySelector('[data-share-card="true"]')
+          if (clonedElement) {
+            // 모든 자식 요소가 보이도록 설정
+            clonedElement.style.overflow = 'visible'
+            clonedElement.style.height = 'auto'
+            clonedElement.style.minHeight = 'auto'
+          }
+        }
       })
 
-      console.log('Canvas 생성 완료:', { width: canvas.width, height: canvas.height })
+      console.log('Canvas 생성 완료:', { 
+        width: canvas.width, 
+        height: canvas.height 
+      })
 
-      // Blob으로 변환
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          console.error('Blob 생성 실패')
-          setError('이미지 변환에 실패했어요. 다시 시도해주세요! 📸')
-          setImageDownloading(false)
-          return
+      // 원래 스크롤 위치로 복원
+      window.scrollTo(originalScrollX, originalScrollY)
+
+      // canvas를 dataURL로 변환
+      const dataUrl = canvas.toDataURL('image/png', 1.0)
+      
+      // 파일명 생성
+      const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+      const safeItemName = item.replace(/[^a-zA-Z0-9가-힣]/g, '_')
+      const fileName = `합리적선택_${safeItemName}_${timestamp}.png`
+      
+      // 모바일 환경 감지
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      
+      if (isMobile) {
+        // 모바일: 새 탭에서 이미지 열기
+        const newWindow = window.open()
+        if (newWindow) {
+          newWindow.document.write(`
+            <html>
+              <head>
+                <title>${fileName}</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                  body { 
+                    margin: 0; 
+                    padding: 20px;
+                    display: flex; 
+                    flex-direction: column;
+                    justify-content: center; 
+                    align-items: center; 
+                    min-height: 100vh; 
+                    background: #f0f0f0; 
+                  }
+                  img { 
+                    max-width: 100%; 
+                    height: auto;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    border-radius: 12px;
+                  }
+                  .info {
+                    margin-top: 20px;
+                    padding: 15px;
+                    background: white;
+                    border-radius: 8px;
+                    text-align: center;
+                    font-family: sans-serif;
+                    color: #333;
+                  }
+                </style>
+              </head>
+              <body>
+                <img src="${dataUrl}" alt="${fileName}" />
+                <div class="info">
+                  <p><strong>📸 이미지를 길게 눌러서 저장하세요!</strong></p>
+                  <p style="font-size: 14px; color: #666; margin-top: 8px;">
+                    이미지 위에서 길게 누르면<br/>
+                    '이미지 저장' 메뉴가 나타납니다.
+                  </p>
+                </div>
+              </body>
+            </html>
+          `)
+          newWindow.document.close()
+        } else {
+          // 팝업이 차단된 경우
+          setError('팝업 차단을 해제하고 다시 시도해주세요! 📸')
         }
-
-        console.log('Blob 생성 완료:', blob.size, 'bytes')
-
-        // 다운로드 링크 생성
-        const url = URL.createObjectURL(blob)
+      } else {
+        // PC: 일반 다운로드
         const link = document.createElement('a')
-        const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-        const safeItemName = item.replace(/[^a-zA-Z0-9가-힣]/g, '_')
-        link.download = `합리적선택_${safeItemName}_${timestamp}.png`
-        link.href = url
+        link.download = fileName
+        link.href = dataUrl
         link.style.display = 'none'
         
         document.body.appendChild(link)
         link.click()
         
-        // 정리
         setTimeout(() => {
           document.body.removeChild(link)
-          URL.revokeObjectURL(url)
-          setImageDownloading(false)
-          console.log('이미지 다운로드 완료')
         }, 100)
-      }, 'image/png', 0.95)
+      }
+      
+      setImageDownloading(false)
+      console.log('이미지 다운로드 완료')
+      
     } catch (err) {
       console.error('이미지 저장 오류:', err)
       setError(`이미지 저장에 실패했어요: ${err.message}. 다시 시도해주세요! 📸`)
@@ -1293,6 +1363,7 @@ function App() {
                         {/* 공유 카드 */}
                         <div 
                           ref={shareCardRef}
+                          data-share-card="true"
                           className="rounded-3xl shadow-2xl p-8 relative overflow-visible"
                           style={{ 
                             minHeight: 'auto',
@@ -1412,7 +1483,7 @@ function App() {
                             <p className="text-sm md:text-lg text-gray-600 mt-2 md:mt-3 font-bold">
                               {imageDownloading 
                                 ? '⏳ 잠시만 기다려주세요...' 
-                                : '🔗 버튼을 누르고 나의 결과를 친구들과 공유하자!'}
+                                : '📸 버튼을 누르고 나의 결과를 친구들과 공유하자!'}
                             </p>
                           </div>
 
