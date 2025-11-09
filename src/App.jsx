@@ -615,9 +615,14 @@ function App() {
       <div className="flex flex-col items-center gap-4 md:gap-6 p-4 md:p-8 pt-24 md:pt-32 pb-8 md:pb-16">
         {/* 메인 제목 */}
         {!options && !showLearningSummary && (
-          <h1 className="text-3xl md:text-6xl lg:text-7xl font-black text-purple-600 drop-shadow-lg mb-2 md:mb-4 sticker border-purple-400 px-4 md:px-8 py-3 md:py-4 rounded-2xl md:rounded-3xl">
-            합리적 선택하기 🛒
-          </h1>
+          <div className="flex flex-col items-center gap-2 md:gap-3 mb-2 md:mb-4 sticker border-purple-400 px-4 md:px-8 py-3 md:py-4 rounded-2xl md:rounded-3xl">
+            <h1 className="text-3xl md:text-6xl lg:text-7xl font-black text-purple-600 drop-shadow-lg">
+              씽크픽 🛒
+            </h1>
+            <h2 className="text-base md:text-xl lg:text-2xl font-bold text-purple-500 drop-shadow-md">
+              합리적 선택하기
+            </h2>
+          </div>
         )}
 
         {/* 1단계: 입력 폼 */}
